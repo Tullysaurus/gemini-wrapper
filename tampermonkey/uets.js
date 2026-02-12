@@ -481,11 +481,9 @@
     });
   };
 
-  const sendQuestionToServer = (questionId, questionType, answerIds) =>
-    postToServer("/api/question", { questionId, questionType, answerIds });
+  const sendQuestionToServer = (questionId, questionType, answerIds) => null
 
-  const sendAnswerToServer = (questionId, correctAnswers, answerType = null) =>
-    postToServer("/api/answer", { questionId, correctAnswers, answerType });
+  const sendAnswerToServer = (questionId, correctAnswers, answerType = null) => null
 
   // === ANSWER HIGHLIGHTING ===
   const highlightCorrectAnswers = (correctAnswers, questionType) => {

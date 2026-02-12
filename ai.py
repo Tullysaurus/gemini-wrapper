@@ -9,17 +9,14 @@ load_dotenv()
 SECURE_1PSID = os.getenv("SECURE_1PSID")
 SECURE_1PSIDTS = os.getenv("SECURE_1PSIDTS")
 
-async def get_gemini_client():
-    if not SECURE_1PSID or not SECURE_1PSIDTS:
-        raise HTTPException(status_code=500, detail="Server Error: Missing Gemini Cookies in environment variables.")
-    
-    client = GeminiClient(SECURE_1PSID, SECURE_1PSIDTS)
-    # Initialize client (adjust timeout/auto_close as needed)
-    await client.init(timeout=30, auto_close=False, auto_refresh=True)
-    return client
+if not SECURE_1PSID or not SECURE_1PSIDTS:
+    raise HTTPException(status_code=500, detail="Server Error: Missing Gemini Cookies in environment variables.")
+
+client = GeminiClient(SECURE_1PSID, SECURE_1PSIDTS)
+client.init(timeout=30, auto_close=False, auto_refresh=True)
+
 
 async def generate_response(prompt_text: str, image_data: bytes = None):
-    client = await get_gemini_client()
     if image_data:
         response = await client.generate_content(prompt_text, image=image_data)
     else:
