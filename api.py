@@ -81,47 +81,7 @@ async def generate_content(
         raise HTTPException(status_code=400, detail="Invalid API Key")
 
     try:
-        prompt_text = ""
-        image_data = None
-        
-        # 2. Parse the complex JS payload
-        for content in request.contents:
-            for part in content.parts:
-                # Handle Text
-                if part.text:
-                    prompt_text += part.text + "\n"
-                
-                # Handle Image (Base64)
-                if part.inline_data:
-                    try:
-                        image_data = base64.b64decode(part.inline_data.data)
-                    except Exception:
-                        print("Failed to decode base64 image")
-
-        # 3. Call the Unofficial WebAPI
-        response_text = await generate_response(prompt_text, image_data)
-
-        # 4. Format Response to EXACTLY match what your JS expects
-        # JS expects: result.candidates[0].content.parts[0].text
-        formatted_response = {
-            "candidates": [
-                {
-                    "content": {
-                        "parts": [
-                            {
-                                "text": response_text
-                            }
-                        ],
-                        "role": "model"
-                    },
-                    "finishReason": "STOP",
-                    "index": 0,
-                    "safetyRatings": [] # Empty to satisfy schema if needed
-                }
-            ]
-        }
-
-        return formatted_response
+        return await process_gemini_request(request.contents)
 
     except Exception as e:
         print(f"Error: {e}")

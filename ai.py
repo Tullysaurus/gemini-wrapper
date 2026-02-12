@@ -24,7 +24,24 @@ async def generate_response(prompt_text: str, image_data: bytes = None):
         response = await client.generate_content(prompt_text, image=image_data)
     else:
         response = await client.generate_content(prompt_text)
-    return response.text
+    
+    return {
+        "candidates": [
+            {
+                "content": {
+                    "parts": [
+                        {
+                            "text": response.text
+                        }
+                    ],
+                    "role": "model"
+                },
+                "finishReason": "STOP",
+                "index": 0,
+                "safetyRatings": []
+            }
+        ]
+    }
 
 async def process_gemini_request(contents):
     prompt_text = ""
