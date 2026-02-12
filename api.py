@@ -72,7 +72,6 @@ class AnswerSubmission(BaseModel):
 
 @app.post("/ai")
 async def generate_content(
-    model: str, 
     request: GenerateContentRequest, 
     key: str = Query(..., description="The API Key") # catches ?key=... from JS
 ):
@@ -94,27 +93,3 @@ async def generate_content(
             }
         }
 
-# --- UETS Endpoints ---
-
-@app.post("/api/question")
-async def query_question(query: QuestionQuery, db: Session = Depends(get_db)):
-    question = db.query(Question).filter(Question.question_id == query.questionId).first()
-    if question:
-        return {
-            "hasAnswer": True,
-            "correctAnswers": question.correct_answers,
-            "questionType": question.answer_type or query.questionType
-        }
-    return {"hasAnswer": False}
-
-@app.post("/api/answer")
-async def submit_answer(submission: AnswerSubmission, db: Session = Depends(get_db)):
-    question = db.query(Question).filter(Question.question_id == submission.questionId).first()
-    if question:
-        question.correct_answers = submission.correctAnswers
-        question.answer_type = submission.answerType
-    else:
-        question = Question(question_id=submission.questionId, correct_answers=submission.correctAnswers, answer_type=submission.answerType)
-        db.add(question)
-    db.commit()
-    return {"status": "success"}

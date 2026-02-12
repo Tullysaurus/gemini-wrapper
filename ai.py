@@ -25,6 +25,7 @@ async def generate_response(prompt_text: str, image_data: bytes = None):
     else:
         response = await client.generate_content(prompt_text)
     
+    print(response.text)
     return {
         "candidates": [
             {
@@ -46,6 +47,8 @@ async def generate_response(prompt_text: str, image_data: bytes = None):
 async def process_gemini_request(contents):
     prompt_text = ""
     image_data = None
+
+    print(contents)
     
     
     for content in contents:
