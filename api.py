@@ -138,7 +138,7 @@ async def ask_cached(
         # Check DB
         saved_q = db.query(SavedQuestion).filter(SavedQuestion.prompt_hash == prompt_hash).first()
         
-        if saved_q and not saved_q.is_expired():
+        if saved_q:
             return saved_q.response
 
         # If not found or expired, call AI

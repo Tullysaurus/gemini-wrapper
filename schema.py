@@ -1,6 +1,6 @@
 from sqlalchemy import Column, String, JSON, DateTime, Text
 from sqlalchemy.ext.declarative import declarative_base
-from datetime import datetime, timedelta
+from datetime import datetime
 
 Base = declarative_base()
 
@@ -18,9 +18,6 @@ class SavedQuestion(Base):
     prompt = Column(Text)
     response = Column(JSON)
     created_at = Column(DateTime, default=datetime.utcnow)
-
-    def is_expired(self):
-        return datetime.utcnow() > self.created_at + timedelta(days=30)
 
 class APIKeyHash(Base):
     __tablename__ = "api_key_hashes"
