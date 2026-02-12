@@ -8,15 +8,11 @@ from typing import List, Optional, Dict, Any
 from dotenv import load_dotenv
 from sqlalchemy.orm import Session
 from database import get_db
-from schema import Question, SavedQuestion
+from schema import Question, SavedQuestion, APIKeyHash
 from ai import process_gemini_request
 
 
 load_dotenv()
-
-# 2. Your Custom API Key (Front-end)
-# Matches the `apiKey` variable in your JS
-VALID_API_KEY = os.getenv("VALID_API_KEY")
 
 app = FastAPI(title="Gemini API Mirror")
 
@@ -92,7 +88,8 @@ async def generate_content(
     db: Session = Depends(get_db)
 ):
     # 1. Validate API Key
-    if key != VALID_API_KEY:
+    hashed_key = hashlib.sha256(key.encode()).hexdigest()
+    if not db.query(APIKeyHash).filter(APIKeyHash.key_hash == hashed_key).first():
         raise HTTPException(status_code=400, detail="Invalid API Key")
 
     try:
@@ -116,6 +113,50 @@ async def generate_content(
     except Exception as e:
         print(f"Error: {e}")
         # Return a structure that your JS error handler catches (result.error.message)
+        return {
+            "error": {
+                "code": 500,
+                "message": str(e),
+                "status": "INTERNAL_ERROR"
+            }
+        }
+
+@app.post("/ask")
+async def ask_cached(
+    request: GenerateContentRequest,
+    key: str = Query(..., description="The API Key"),
+    db: Session = Depends(get_db)
+):
+    hashed_key = hashlib.sha256(key.encode()).hexdigest()
+
+    if not db.query(APIKeyHash).filter(APIKeyHash.key_hash == hashed_key).first():
+        raise HTTPException(status_code=400, detail="Invalid API Key")
+
+    try:
+        prompt_text, prompt_hash = get_prompt_hash(request.contents)
+        
+        # Check DB
+        saved_q = db.query(SavedQuestion).filter(SavedQuestion.prompt_hash == prompt_hash).first()
+        
+        if saved_q and not saved_q.is_expired():
+            return saved_q.response
+
+        # If not found or expired, call AI
+        response = await process_gemini_request(request.contents)
+
+        # Save to DB
+        if saved_q:
+            saved_q.response = response
+            saved_q.created_at = datetime.utcnow()
+        else:
+            saved_q = SavedQuestion(prompt_hash=prompt_hash, prompt=prompt_text, response=response)
+            db.add(saved_q)
+        db.commit()
+
+        return response
+
+    except Exception as e:
+        print(f"Error: {e}")
         return {
             "error": {
                 "code": 500,

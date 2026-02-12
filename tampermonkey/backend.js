@@ -114,7 +114,7 @@ Explanation: [Rich Text Explanation]`;
             }
         }
 
-        const apiUrl = `https://ugh.tully-dev.com/ai?key=${apiKey}`;
+        const apiUrl = `https://ugh.tully-dev.com/ask?key=${apiKey}`;
         const payload = {
             contents: [{ parts: parts }],
             generationConfig: CONFIG
