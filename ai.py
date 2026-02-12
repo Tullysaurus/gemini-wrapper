@@ -3,6 +3,7 @@ import base64
 import asyncio
 import tempfile
 from gemini_webapi import GeminiClient
+from gemini_webapi.constants import Model
 from dotenv import load_dotenv
 from fastapi import HTTPException
 
@@ -18,24 +19,22 @@ client = GeminiClient(SECURE_1PSID, SECURE_1PSIDTS)
 asyncio.run(client.init(timeout=30, auto_close=False, auto_refresh=True))
 
 
-async def generate_response(prompt_text: str, image_data: bytes = None):
+async def generate_response(prompt_text: str, image_data: bytes = None, model : str="gemini-3.0-flash-thinking"):
     if image_data:
         with tempfile.NamedTemporaryFile(delete=False, suffix=".jpg") as temp_file:
             temp_file.write(image_data)
             temp_file_path = temp_file.name
 
         try:
-            response = await client.generate_content(prompt_text, files=[temp_file_path])
+            response = await client.generate_content(prompt_text, files=[temp_file_path], model=model)
         except Exception as e:
             print(f"Warning: Image generation failed ({e}). Falling back to text-only.")
-            response = await client.generate_content(prompt_text)
+            response = await client.generate_content(prompt_text, model=model)
         finally:
             if os.path.exists(temp_file_path):
                 os.remove(temp_file_path)
     else:
-        response = await client.generate_content(prompt_text)
-    
-    print(response.text)
+        response = await client.generate_content(prompt_text, model=model)
     return {
         "candidates": [
             {
@@ -54,7 +53,7 @@ async def generate_response(prompt_text: str, image_data: bytes = None):
         ]
     }
 
-async def process_gemini_request(contents):
+async def process_gemini_request(contents, model="gemini-3.0-flash-thinking"):
     prompt_text = ""
     image_data = None    
     
@@ -71,4 +70,4 @@ async def process_gemini_request(contents):
                 except Exception:
                     print("Failed to decode base64 image")
 
-    return await generate_response(prompt_text, image_data)
+    return await generate_response(prompt_text, image_data, model)
