@@ -37,8 +37,6 @@ async def ensure_initialized():
 
         initialized = True
 
-
-asyncio.run(ensure_initialized())
 async def generate_response_stream(prompt_text: str, files: list[bytes], model : str=default_model):
     await ensure_initialized()
 
