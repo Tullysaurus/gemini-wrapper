@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         Universal Educational Tool Suite
 // @namespace    http://tampermonkey.net/
-// @version      1.5.0
+// @version      1.5.1
 // @description  A unified tool for cheating on online test sites
 // @author       Tullysaurus
 // @license      GPL-3.0
@@ -1772,6 +1772,10 @@
 
     // Listen for Backend Responses
     window.addEventListener('UGH_Response_Success', (e) => {
+        GM_log(e.detail.text);
+        parseAndDisplay(e.detail.text);
+    });
+    window.addEventListener('UGH_Response_Progress', (e) => {
         parseAndDisplay(e.detail.text);
     });
     window.addEventListener('UGH_Response_Loading', () => {

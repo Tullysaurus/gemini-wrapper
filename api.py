@@ -1,7 +1,7 @@
 import os
 import hashlib
 from datetime import datetime
-from fastapi import FastAPI, HTTPException, Query, Request, Depends
+from fastapi import FastAPI, HTTPException, Query, Request, Depends, BackgroundTasks
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import StreamingResponse
 from pydantic import BaseModel, Field
@@ -80,11 +80,23 @@ def get_prompt_hash(contents: List[Content]) -> tuple[str, str]:
     prompt_text = prompt_text.strip()
     return prompt_text, hashlib.sha256(prompt_text.encode()).hexdigest()
 
+def save_question_to_db(db, prompt_hash, prompt_text, response):
+    saved_q = db.query(SavedQuestion).filter(SavedQuestion.prompt_hash == prompt_hash).first()
+    if saved_q:
+        saved_q.response = response
+        saved_q.created_at = datetime.utcnow()
+    else:
+        saved_q = SavedQuestion(prompt_hash=prompt_hash, prompt=prompt_text, response=response)
+        db.add(saved_q)
+    db.commit()
+
 # --- Endpoints ---
+
 
 @app.post("/ai")
 async def generate_content(
     request: GenerateContentRequest, 
+    background_tasks: BackgroundTasks,
     key: str = Query(..., description="The API Key"), # catches ?key=... from JS
     db: Session = Depends(get_db)
 ):
@@ -117,15 +129,7 @@ async def generate_content(
                     }
                 ]
             }
-
-            saved_q = db.query(SavedQuestion).filter(SavedQuestion.prompt_hash == prompt_hash).first()
-            if saved_q:
-                saved_q.response = response_data
-                saved_q.created_at = datetime.utcnow()
-            else:
-                saved_q = SavedQuestion(prompt_hash=prompt_hash, prompt=prompt_text, response=response_data)
-                db.add(saved_q)
-            db.commit()
+            background_tasks.add_task(save_question_to_db, db, prompt_hash, prompt_text, response_data)
 
         except Exception as e:
             print(f"Stream Error: {e}")
@@ -136,6 +140,7 @@ async def generate_content(
 @app.post("/ask")
 async def ask_cached(
     request: GenerateContentRequest,
+    background_tasks: BackgroundTasks,
     key: str = Query(..., description="The API Key"),
     db: Session = Depends(get_db)
 ):
@@ -164,6 +169,7 @@ async def ask_cached(
         try:
             async for chunk in process_gemini_request_stream(request.contents):
                 full_response_text += chunk
+                print(chunk)
                 yield chunk
             
             response_data = {
@@ -180,14 +186,7 @@ async def ask_cached(
                 ]
             }
             
-            saved_q = db.query(SavedQuestion).filter(SavedQuestion.prompt_hash == prompt_hash).first()
-            if saved_q:
-                saved_q.response = response_data
-                saved_q.created_at = datetime.utcnow()
-            else:
-                saved_q = SavedQuestion(prompt_hash=prompt_hash, prompt=prompt_text, response=response_data)
-                db.add(saved_q)
-            db.commit()
+            background_tasks.add_task(save_question_to_db, db, prompt_hash, prompt_text, response_data)
 
         except Exception as e:
             print(f"Stream Error: {e}")

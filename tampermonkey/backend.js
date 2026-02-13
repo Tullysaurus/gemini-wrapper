@@ -66,14 +66,14 @@
         prompt += `
 STRICT FORMATTING RULES:
 1. **Correct Answer**: Provide the direct answer clearly.
-2. **Explanation**: Provide a detailed reasoning below it.
+2. **Explanation**: Provide concise reasoning below it.
 3. **Rich Text**:
    - Use **bold** for key terms and the correct option.
    - Use *italics* for emphasis or definitions.
    - Use lists (lines starting with -) for steps or multiple points.
    - Use \`code\` formatting for technical terms or numbers if relevant.
 4. **No Chattyness**: Do NOT ask if the user needs more help. Do NOT ask follow-up questions. End the response immediately after the explanation.
-
+5. Do not include images in your output.
 OUTPUT STRUCTURE:
 Correct Answer: [Answer]
 
@@ -120,34 +120,49 @@ Explanation: [Rich Text Explanation]`;
             generationConfig: CONFIG
         };
 
+        let streamProcessed = false;
+
         GM_xmlhttpRequest({
             method: "POST",
             url: apiUrl,
             headers: { "Content-Type": "application/json" },
             data: JSON.stringify(payload),
-            onprogress: (response) => {
-                const text = response.responseText;
-                if (text) {
-                    if (!text.startsWith("[ERROR:")) {
-                        console.log(text);
-                        dispatchToFrontend('UGH_Response_Success', { text: text });
+            responseType: 'stream',
+            onreadystatechange: async (response) => {
+                if (response.readyState >= 2 && !streamProcessed) {
+                    if (!response.response) return;
+                    streamProcessed = true;
+
+                    if (response.status < 200 || response.status >= 300) {
+                        dispatchToFrontend('UGH_Response_Error', { message: `API Error: ${response.status}` });
+                        return;
                     }
-                }
-            },
-            onload: (response) => {
-                if (response.status >= 200 && response.status < 300) {
-                    const text = response.responseText;
-                    if (text) {
-                        if (text.startsWith("[ERROR:")) {
-                            dispatchToFrontend('UGH_Response_Error', { message: text });
-                        } else {
-                            dispatchToFrontend('UGH_Response_Success', { text: text });
+
+                    const stream = response.response;
+                    const reader = stream.getReader();
+                    const decoder = new TextDecoder();
+                    let accumulatedText = "";
+
+                    try {
+                        while (true) {
+                            const { done, value } = await reader.read();
+                            if (done) break;
+
+                            const chunk = decoder.decode(value, { stream: true });
+                            accumulatedText += chunk;
+
+                            if (accumulatedText.startsWith("[ERROR:")) {
+                                dispatchToFrontend('UGH_Response_Error', { message: accumulatedText });
+                                return;
+                            }
+
+                            dispatchToFrontend('UGH_Response_Progress', { text: accumulatedText });
                         }
-                    } else {
-                        dispatchToFrontend('UGH_Response_Error', { message: "Empty response." });
+                        dispatchToFrontend('UGH_Response_Success', { text: accumulatedText });
+                    } catch (err) {
+                        console.error("Stream reading error", err);
+                        dispatchToFrontend('UGH_Response_Error', { message: "Stream reading error" });
                     }
-                } else {
-                    dispatchToFrontend('UGH_Response_Error', { message: `API Error: ${response.status}` });
                 }
             },
             onerror: () => dispatchToFrontend('UGH_Response_Error', { message: "Network request failed." }),

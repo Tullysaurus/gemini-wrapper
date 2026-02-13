@@ -27,17 +27,17 @@ async def generate_response_stream(prompt_text: str, image_data: bytes = None, m
             temp_file.write(image_data)
             temp_file_path = temp_file.name
         try:
-            async for chunk in client.generate_content_stream(prompt_text, files=[temp_file_path], model=model):
+            async for chunk in client.generate_content_stream(prompt_text, files=[temp_file_path]):
                 yield chunk.text_delta
         except Exception as e:
             print(f"Warning: Image generation failed ({e}). Falling back to text-only.")
-            async for chunk in client.generate_content_stream(prompt_text, model=model):
+            async for chunk in client.generate_content_stream(prompt_text):
                 yield chunk.text_delta
         finally:
             if os.path.exists(temp_file_path):
                 os.remove(temp_file_path)
     else:
-        async for chunk in client.generate_content_stream(prompt_text, model=model):
+        async for chunk in client.generate_content_stream(prompt_text):
             yield chunk.text_delta
 
 async def process_gemini_request_stream(contents, model=default_model):

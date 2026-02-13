@@ -242,7 +242,14 @@
 
     const showResponsePopup = (contentHTML, isLoading = false) => {
         let popup = document.getElementById("ugh-gemini-popup");
-        if (popup) popup.remove();
+        const bodyContent = isLoading 
+            ? `<div class="ugh-loading-spinner"></div><div style="text-align:center;margin-top:10px;color:#5f6368">${contentHTML}</div>` 
+            : contentHTML;
+
+        if (popup) {
+            popup.querySelector('.ugh-popup-body').innerHTML = bodyContent;
+            return;
+        }
 
         popup = document.createElement("div");
         popup.id = "ugh-gemini-popup";
@@ -254,7 +261,7 @@
                 <button class="ugh-popup-close">${ICONS.close}</button>
             </div>
             <div class="ugh-popup-body">
-                ${isLoading ? `<div class="ugh-loading-spinner"></div><div style="text-align:center;margin-top:10px;color:#5f6368">${contentHTML}</div>` : contentHTML}
+                ${bodyContent}
             </div>
         `;
         popup.querySelector('.ugh-popup-close').onclick = () => popup.remove();
@@ -266,7 +273,7 @@
         const explanationRegex = /Explanation:\s*(.+)/is;
         const answerMatch = rawText.match(answerRegex);
         const explanationMatch = rawText.match(explanationRegex);
-        const answer = answerMatch ? formatRichText(answerMatch[1].trim()) : "Analysis Complete";
+        const answer = answerMatch ? formatRichText(answerMatch[1].trim()) : (rawText.length < 100 ? "Analyzing..." : "Analysis Complete");
         const explanation = explanationMatch ? formatRichText(explanationMatch[1].trim()) : formatRichText(rawText.replace(answerRegex, '').trim());
 
         const html = `<div class="ugh-answer-box">${answer}</div><div class="ugh-explanation-text">${explanation}</div>`;
@@ -276,6 +283,7 @@
     // === LISTENERS FOR BACKEND RESPONSES ===
     window.addEventListener('UGH_Response_Loading', () => showResponsePopup("Analyzing...", true));
     window.addEventListener('UGH_Response_Success', (e) => parseAndDisplay(e.detail.text));
+    window.addEventListener('UGH_Response_Progress', (e) => parseAndDisplay(e.detail.text));
     window.addEventListener('UGH_Response_Error', (e) => {
         showResponsePopup(`<div style="color: #d93025; font-weight: 500;">${e.detail.message}</div>`, false);
     });
