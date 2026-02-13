@@ -1,7 +1,3 @@
-Based on the repository files, here is a professional `README.md` for the **Universal Educational Tool Suite (UETS)**.
-
----
-
 # Universal Educational Tool Suite (UETS)
 
 A comprehensive, full-stack solution designed to provide AI-powered assistance and automated optimizations for online educational platforms. This project bridges a Python-based FastAPI backend with powerful client-side Tampermonkey scripts to deliver real-time analysis and automation.
