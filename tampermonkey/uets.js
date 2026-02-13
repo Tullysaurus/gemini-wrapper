@@ -3,7 +3,7 @@
 // @namespace    http://tampermonkey.net/
 // @version      1.5.1
 // @description  A unified tool for cheating on online test sites
-// @author       Tullysaurus
+// @author       Nyx, Tullysaurus
 // @license      GPL-3.0
 // @match        https://quizizz.com/*
 // @match        https://wayground.com/*
@@ -1825,7 +1825,7 @@
     createToggleButton();
     initializeDomainSpecific();
     GM_log(`[+] UETS loaded on ${sharedState.currentDomain}`);
-    GM_log(`[+] Made by Tullysaurus`);
+    GM_log(`[+] Made by Nyx, modified by Tullysaurus (with Gemini's help)`);
 
     // Check for first run and show welcome popup
     if (!GM_getValue(sharedState.firstRunKey, false)) {
