@@ -13,9 +13,11 @@ echo "Timestamp: $(date)"
 echo "Current directory: $(pwd)"
 
 echo "Activating virtual environment..."
-if [ -f ".venv/bin/activate" ]; then
-  source .venv/bin/activate
+if [ ! -f ".venv/bin/activate" ]; then
+  python -m venv .venv
 fi
+
+source .venv/bin/activate
 
 if [ -f ".env" ]; then
   echo "Loading environment variables from .env file..."
