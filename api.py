@@ -3,13 +3,14 @@ import hashlib
 from datetime import datetime
 from fastapi import FastAPI, HTTPException, Query, Request, Depends
 from fastapi.middleware.cors import CORSMiddleware
+from fastapi.responses import StreamingResponse
 from pydantic import BaseModel, Field
 from typing import List, Optional, Dict, Any
 from dotenv import load_dotenv
 from sqlalchemy.orm import Session
 from database import get_db
 from schema import Question, SavedQuestion, APIKeyHash
-from ai import process_gemini_request
+from ai import process_gemini_request_stream
 
 
 load_dotenv()
@@ -92,34 +93,45 @@ async def generate_content(
     if not db.query(APIKeyHash).filter(APIKeyHash.key_hash == hashed_key).first():
         raise HTTPException(status_code=400, detail="Invalid API Key")
 
-    try:
-        # Process request
-        response = await process_gemini_request(request.contents)
-
-        # Save to DB (Overwrite)
-        prompt_text, prompt_hash = get_prompt_hash(request.contents)
-        saved_q = db.query(SavedQuestion).filter(SavedQuestion.prompt_hash == prompt_hash).first()
-        
-        if saved_q:
-            saved_q.response = response
-            saved_q.created_at = datetime.utcnow()
-        else:
-            saved_q = SavedQuestion(prompt_hash=prompt_hash, prompt=prompt_text, response=response)
-            db.add(saved_q)
-        db.commit()
-
-        return response
-
-    except Exception as e:
-        print(f"Error: {e}")
-        # Return a structure that your JS error handler catches (result.error.message)
-        return {
-            "error": {
-                "code": 500,
-                "message": str(e),
-                "status": "INTERNAL_ERROR"
+    async def stream_generator():
+        full_response_text = ""
+        try:
+            async for chunk in process_gemini_request_stream(request.contents):
+                full_response_text += chunk
+                yield chunk
+            
+            # Save to DB (Overwrite)
+            prompt_text, prompt_hash = get_prompt_hash(request.contents)
+            
+            # Construct response object similar to non-streaming
+            response_data = {
+                "candidates": [
+                    {
+                        "content": {
+                            "parts": [{"text": full_response_text}],
+                            "role": "model"
+                        },
+                        "finishReason": "STOP",
+                        "index": 0,
+                        "safetyRatings": []
+                    }
+                ]
             }
-        }
+
+            saved_q = db.query(SavedQuestion).filter(SavedQuestion.prompt_hash == prompt_hash).first()
+            if saved_q:
+                saved_q.response = response_data
+                saved_q.created_at = datetime.utcnow()
+            else:
+                saved_q = SavedQuestion(prompt_hash=prompt_hash, prompt=prompt_text, response=response_data)
+                db.add(saved_q)
+            db.commit()
+
+        except Exception as e:
+            print(f"Stream Error: {e}")
+            yield f"[ERROR: {str(e)}]"
+
+    return StreamingResponse(stream_generator(), media_type="text/plain")
 
 @app.post("/ask")
 async def ask_cached(
@@ -132,35 +144,53 @@ async def ask_cached(
     if not db.query(APIKeyHash).filter(APIKeyHash.key_hash == hashed_key).first():
         raise HTTPException(status_code=400, detail="Invalid API Key")
 
-    try:
+    async def stream_generator():
         prompt_text, prompt_hash = get_prompt_hash(request.contents)
         
         # Check DB
         saved_q = db.query(SavedQuestion).filter(SavedQuestion.prompt_hash == prompt_hash).first()
         
         if saved_q:
-            return saved_q.response
+            try:
+                print("Using cached response")
+                text = saved_q.response["candidates"][0]["content"]["parts"][0]["text"]
+                yield text
+            except Exception:
+                yield ""
+            return
 
-        # If not found or expired, call AI
-        response = await process_gemini_request(request.contents)
-
-        # Save to DB
-        if saved_q:
-            saved_q.response = response
-            saved_q.created_at = datetime.utcnow()
-        else:
-            saved_q = SavedQuestion(prompt_hash=prompt_hash, prompt=prompt_text, response=response)
-            db.add(saved_q)
-        db.commit()
-
-        return response
-
-    except Exception as e:
-        print(f"Error: {e}")
-        return {
-            "error": {
-                "code": 500,
-                "message": str(e),
-                "status": "INTERNAL_ERROR"
+        # Not cached
+        full_response_text = ""
+        try:
+            async for chunk in process_gemini_request_stream(request.contents):
+                full_response_text += chunk
+                yield chunk
+            
+            response_data = {
+                "candidates": [
+                    {
+                        "content": {
+                            "parts": [{"text": full_response_text}],
+                            "role": "model"
+                        },
+                        "finishReason": "STOP",
+                        "index": 0,
+                        "safetyRatings": []
+                    }
+                ]
             }
-        }
+            
+            saved_q = db.query(SavedQuestion).filter(SavedQuestion.prompt_hash == prompt_hash).first()
+            if saved_q:
+                saved_q.response = response_data
+                saved_q.created_at = datetime.utcnow()
+            else:
+                saved_q = SavedQuestion(prompt_hash=prompt_hash, prompt=prompt_text, response=response_data)
+                db.add(saved_q)
+            db.commit()
+
+        except Exception as e:
+            print(f"Stream Error: {e}")
+            yield f"[ERROR: {str(e)}]"
+
+    return StreamingResponse(stream_generator(), media_type="text/plain")

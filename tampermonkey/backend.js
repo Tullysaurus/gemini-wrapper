@@ -125,19 +125,29 @@ Explanation: [Rich Text Explanation]`;
             url: apiUrl,
             headers: { "Content-Type": "application/json" },
             data: JSON.stringify(payload),
-            onload: (response) => {
-                try {
-                    const result = JSON.parse(response.responseText);
-                    const aiText = result.candidates?.[0]?.content?.parts?.[0]?.text;
-                    if (aiText) {
-                        dispatchToFrontend('UGH_Response_Success', { text: aiText });
-                    } else if (result.error) {
-                        dispatchToFrontend('UGH_Response_Error', { message: `API Error: ${result.error.message}` });
-                    } else {
-                        dispatchToFrontend('UGH_Response_Error', { message: "Unknown API response." });
+            onprogress: (response) => {
+                const text = response.responseText;
+                if (text) {
+                    if (!text.startsWith("[ERROR:")) {
+                        console.log(text);
+                        dispatchToFrontend('UGH_Response_Success', { text: text });
                     }
-                } catch (e) {
-                    dispatchToFrontend('UGH_Response_Error', { message: "Failed to parse JSON response." });
+                }
+            },
+            onload: (response) => {
+                if (response.status >= 200 && response.status < 300) {
+                    const text = response.responseText;
+                    if (text) {
+                        if (text.startsWith("[ERROR:")) {
+                            dispatchToFrontend('UGH_Response_Error', { message: text });
+                        } else {
+                            dispatchToFrontend('UGH_Response_Success', { text: text });
+                        }
+                    } else {
+                        dispatchToFrontend('UGH_Response_Error', { message: "Empty response." });
+                    }
+                } else {
+                    dispatchToFrontend('UGH_Response_Error', { message: `API Error: ${response.status}` });
                 }
             },
             onerror: () => dispatchToFrontend('UGH_Response_Error', { message: "Network request failed." }),

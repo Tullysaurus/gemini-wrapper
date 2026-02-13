@@ -120,7 +120,7 @@
     /* Popup Styles (Matched to Frontend.js) */
     .ugh-response-popup {
         position: fixed; top: 20px; right: 20px; background: #ffffff; color: #202124;
-        border-radius: 16px; padding: 0; z-index: 999999; width: 400px;
+        border-radius: 16px; padding: 0; z-index: 999999; width: 400px; max-width: 90vw;
         box-shadow: 0 8px 24px rgba(0,0,0,0.15); font-family: 'Roboto', sans-serif;
         display: flex; flex-direction: column; animation: slideInRight 0.3s ease-out;
         overflow: hidden; border: 1px solid #dadce0;
@@ -133,6 +133,10 @@
     .ugh-popup-close { background: none; border: none; cursor: pointer; color: #5f6368; display:flex; align-items:center;}
     .ugh-popup-close:hover { color: #202124; }
     .ugh-popup-body { padding: 20px; max-height: 80vh; overflow-y: auto; font-size: 14px; line-height: 1.6; color: #3c4043; }
+    .ugh-popup-body::-webkit-scrollbar { width: 8px; }
+    .ugh-popup-body::-webkit-scrollbar-track { background: #f1f1f1; border-radius: 4px; }
+    .ugh-popup-body::-webkit-scrollbar-thumb { background: #c1c1c1; border-radius: 4px; }
+    .ugh-popup-body::-webkit-scrollbar-thumb:hover { background: #a8a8a8; }
 
     .ugh-answer-box {
         background: #e8f0fe; color: #1967d2; padding: 16px; border-radius: 12px;
@@ -834,7 +838,7 @@
     const explanationRegex = /Explanation:\s*(.+)/is;
     const answerMatch = rawText.match(answerRegex);
     const explanationMatch = rawText.match(explanationRegex);
-    const answer = answerMatch ? formatRichText(answerMatch[1].trim()) : "Analysis Complete";
+    const answer = answerMatch ? formatRichText(answerMatch[1].trim()) : (rawText.length < 100 ? "Analyzing..." : "Analysis Complete");
     const explanation = explanationMatch ? formatRichText(explanationMatch[1].trim()) : formatRichText(rawText.replace(answerRegex, '').trim());
 
     const html = `<div class="ugh-answer-box">${answer}</div><div class="ugh-explanation-text">${explanation}</div>`;
@@ -862,8 +866,19 @@
       sharedState.toastDismissTimeout = null;
     }
 
-    if (popup) popup.remove();
-    
+    const bodyContent = isLoading 
+        ? `<div class="ugh-loading-spinner"></div><div style="text-align:center;margin-top:10px;color:#5f6368">${contentHTML}</div>` 
+        : contentHTML;
+
+    if (popup) {
+        const body = popup.querySelector('.ugh-popup-body');
+        if (body) {
+            body.innerHTML = bodyContent;
+        }
+        const titleEl = popup.querySelector('.ugh-popup-title');
+        if (titleEl) titleEl.textContent = title;
+        return;
+    }
 
     popup = document.createElement("div");
     popup.id = "ugh-gemini-popup";
@@ -875,7 +890,7 @@
             <button class="ugh-popup-close">${ICONS.close}</button>
         </div>
         <div class="ugh-popup-body">
-            ${isLoading ? `<div class="ugh-loading-spinner"></div><div style="text-align:center;margin-top:10px;color:#5f6368">${contentHTML}</div>` : contentHTML}
+            ${bodyContent}
         </div>
     `;
 

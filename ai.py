@@ -9,7 +9,7 @@ from fastapi import HTTPException
 
 load_dotenv()
 
-default_model = "gemini-3.0-flash"
+default_model = Model.G_3_0_FLASH
 
 SECURE_1PSID = os.getenv("SECURE_1PSID")
 SECURE_1PSIDTS = os.getenv("SECURE_1PSIDTS")
@@ -21,41 +21,26 @@ client = GeminiClient(SECURE_1PSID, SECURE_1PSIDTS)
 asyncio.run(client.init(timeout=30, auto_close=False, auto_refresh=True))
 
 
-async def generate_response(prompt_text: str, image_data: bytes = None, model : str=default_model):
+async def generate_response_stream(prompt_text: str, image_data: bytes = None, model : str=default_model):
     if image_data:
         with tempfile.NamedTemporaryFile(delete=False, suffix=".jpg") as temp_file:
             temp_file.write(image_data)
             temp_file_path = temp_file.name
-
         try:
-            response = await client.generate_content(prompt_text, files=[temp_file_path], model=model)
+            async for chunk in client.generate_content_stream(prompt_text, files=[temp_file_path], model=model):
+                yield chunk.text_delta
         except Exception as e:
             print(f"Warning: Image generation failed ({e}). Falling back to text-only.")
-            response = await client.generate_content(prompt_text, model=model)
+            async for chunk in client.generate_content_stream(prompt_text, model=model):
+                yield chunk.text_delta
         finally:
             if os.path.exists(temp_file_path):
                 os.remove(temp_file_path)
     else:
-        response = await client.generate_content(prompt_text, model=model)
-    return {
-        "candidates": [
-            {
-                "content": {
-                    "parts": [
-                        {
-                            "text": response.text
-                        }
-                    ],
-                    "role": "model"
-                },
-                "finishReason": "STOP",
-                "index": 0,
-                "safetyRatings": []
-            }
-        ]
-    }
+        async for chunk in client.generate_content_stream(prompt_text, model=model):
+            yield chunk.text_delta
 
-async def process_gemini_request(contents, model=default_model):
+async def process_gemini_request_stream(contents, model=default_model):
     prompt_text = ""
     image_data = None    
     
@@ -72,4 +57,5 @@ async def process_gemini_request(contents, model=default_model):
                 except Exception:
                     print("Failed to decode base64 image")
 
-    return await generate_response(prompt_text, image_data, model)
+    async for chunk in generate_response_stream(prompt_text, image_data, model):
+        yield chunk
