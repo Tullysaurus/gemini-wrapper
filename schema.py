@@ -4,13 +4,6 @@ from datetime import datetime
 
 Base = declarative_base()
 
-class Question(Base):
-    __tablename__ = "questions"
-
-    question_id = Column(String, primary_key=True, index=True)
-    correct_answers = Column(JSON)
-    answer_type = Column(String, nullable=True)
-
 class SavedQuestion(Base):
     __tablename__ = "saved_questions"
 

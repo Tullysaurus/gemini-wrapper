@@ -9,7 +9,7 @@ from typing import List, Optional, Dict, Any
 from dotenv import load_dotenv
 from sqlalchemy.orm import Session
 from database import get_db, SessionLocal
-from schema import Question, SavedQuestion, APIKeyHash
+from schema import SavedQuestion, APIKeyHash
 from ai import process_gemini_request_stream
 
 
