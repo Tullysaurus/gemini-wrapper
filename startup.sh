@@ -33,22 +33,30 @@ if [[ "$1" == "--refresh" ]]; then
     pip install -r requirements.txt
   fi
 
-  if [ -f "/etc/systemd/system/cloudflared.service" ]; then
-    echo "Deleting cloudflared service"
-    sudo systemctl stop cloudflared
-    sudo systemctl disable cloudflared
-    sudo cloudflared service uninstall
+  if [ -d "/run/systemd/system" ]; then
+    if [ -f "/etc/systemd/system/cloudflared.service" ]; then
+      echo "Deleting cloudflared service"
+      sudo systemctl stop cloudflared
+      sudo systemctl disable cloudflared
+      sudo cloudflared service uninstall
+    fi
+
+    echo "Enabling cloudflared service"
+    sudo cloudflared service install "$TUNNEL_TOKEN"
+
+    sudo systemctl daemon-reload
+    sudo systemctl enable cloudflared
+    sudo systemctl start cloudflared
+  else
+    echo "Systemd not detected. Starting cloudflared in background..."
+    sudo pkill cloudflared || true
+    sudo cloudflared tunnel run --token "$TUNNEL_TOKEN" > /dev/null 2>&1 &
   fi
-
-  echo "Enabling cloudflared service"
-  sudo cloudflared service install "$TUNNEL_TOKEN"
-
-  sudo systemctl daemon-reload
-  sudo systemctl enable cloudflared
-  sudo systemctl start cloudflared
 fi
 
-sudo systemctl reset-failed cloudflared
+if [ -d "/run/systemd/system" ]; then
+  sudo systemctl reset-failed cloudflared
+fi
 
 # Run the main application using python3.
 # The server will run in the foreground, which is what systemd expects.
